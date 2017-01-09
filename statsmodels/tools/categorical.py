@@ -1,5 +1,5 @@
-from statsmodels.tools.data_interface import (get_ndim, flatten_list, is_recarray, transpose, drop_recarray_column,
-                                              recarray_to_pandas, is_col_vector, to_pandas, NumPyInterface)
+from statsmodels.tools.data_interface import (get_ndim, is_recarray, transpose, is_col_vector, to_pandas,
+                                              NumPyInterface)
 
 import pandas as pd
 import numpy as np
@@ -68,3 +68,87 @@ def to_categorical(data, col=None, dictnames=False, drop=False):
         result = pd.concat([to_drop, dummies], axis=1)
 
     return interface.from_statsmodels(result)
+
+
+def flatten_list(data):
+
+    assert type(data) == list
+
+    np_data = np.asarray(data)
+    shape = np_data.shape
+
+    dims = sum(1 for elem in shape if elem > 1)
+
+    if dims > 2:
+        raise ValueError('Data must have no more than two dimensions')
+    else:
+        slicer = slice_2d(shape)
+        data = np_data[slicer].tolist()
+
+    return data
+
+
+def flatten_array(data):
+
+    assert type(data) in [np.ndarray, np.recarray]
+
+    shape = data.shape
+
+    dims = sum(1 for elem in shape if elem > 1)
+
+    if dims > 2:
+        raise ValueError('Data must have no more than two dimensions')
+    else:
+        slicer = slice_2d(shape)
+        data = data[slicer]
+
+    return data
+
+
+def slice_2d(shape):
+
+    s = []
+
+    for index in shape:
+        if index > 1:
+            s.append(slice(None))
+        else:
+            s.append(0)
+
+    return tuple(s)
+
+
+def drop_recarray_column(rec, name):
+
+    names = list(rec.dtype.names)
+
+    if name in names:
+        names.remove(name)
+
+    result = rec[names]
+
+    return result
+
+
+def recarray_to_pandas(data):
+
+    data_list = []
+
+    if data.dtype.names is None:
+
+        if is_col_vector(data):
+            data = transpose(data)
+
+        return pd.Series(data)
+
+    else:
+
+        for name in data.dtype.names:
+            col = data[name]
+
+            if is_col_vector(col):
+                col = transpose(col)
+
+            data_list.append(pd.Series(col, name=name))
+
+        return pd.concat(data_list, axis=1)
